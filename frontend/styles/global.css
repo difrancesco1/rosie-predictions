@@ -1,0 +1,226 @@
+/* Import Google Font */
+@import url('https://fonts.googleapis.com/css2?family=Indie+Flower&family=Pixelify+Sans:wght@400..700&display=swap');
+
+nextjs-portal {
+    display: none;
+  }
+
+* {
+    padding: 0;
+    margin: 0;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+body {
+    background: rgb(254,254,254);
+    background: linear-gradient(180deg, rgba(254,254,254,1) 7%, rgba(217,255,146,1) 80%); 
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    height: 649px;
+    width: 363px;
+}
+
+.container {
+    width: 100%;
+    height: 100%;
+}
+
+.title-container {
+    display: flex;
+    padding-left: 5px;
+    padding-top: 5px;
+    align-items: baseline;
+}
+
+.hero-image-container {
+    width: 100%;
+    max-width: 500px;
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    /* Shadow removed */
+}
+
+.hero-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    /* Shadow removed */
+}
+
+.title-text {
+    font-family: 'Indie Flower';
+    font-weight: lighter;
+}
+
+.title-text-period {
+    font-family: 'Indie Flower';
+    font-weight: lighter;
+    font-size: 40px;
+    color: #81a962;
+}
+
+.login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hero-text-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: "Pixelify Sans", sans-serif;
+}
+
+.hero-text-predictions {
+    color: #74a75a;
+}
+
+
+/* Login Button */
+
+/* Add these styles to your global.css file */
+
+.twitch-login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px 0;
+  }
+  
+  .twitch-login-button {
+    background-color: #9146FF;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+  
+  .twitch-login-button:hover {
+    background-color: #7d2ff3;
+  }
+  
+  .twitch-login-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .twitch-error-message {
+    color: #d32f2f;
+    margin-top: 10px;
+  }
+
+/* Loading Screen */
+
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, rgba(254,254,254,1) 7%, rgba(217,255,146,1) 80%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+  
+  .loading-gif-container {
+    margin-bottom: 20px;
+  }
+  
+  .loading-text {
+    font-family: "Pixelify Sans", sans-serif;
+    font-weight: 400;
+    font-size: 18px;
+    color: #9146FF;
+    text-align: center;
+    max-width: 80%;
+  }
+  
+  .error-message {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    background-color: #ffebee;
+    color: #d32f2f;
+    max-width: 80%;
+    text-align: center;
+  }
+
+  .global-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgb(254,254,254);
+    background: linear-gradient(180deg, rgba(254,254,254,1) 7%, rgba(217,255,146,1) 80%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+  
+  .global-loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  
+  .loading-gif-container {
+    margin-bottom: 15px;
+  }
+  
+  .loading-text {
+    font-family: "Pixelify Sans", sans-serif;
+    font-weight: 400;
+    font-size: 18px;
+    color: #9146FF;
+    text-align: center;
+  }
+  
+  .twitch-login-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 20px 0;
+  }
+  
+  .twitch-login-button {
+    background-color: #9146FF;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+  }
+  
+  .twitch-login-button:hover {
+    background-color: #7d2ff3;
+  }
+  
+  .twitch-login-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .twitch-error-message {
+    color: #d32f2f;
+    margin-top: 10px;
+  }

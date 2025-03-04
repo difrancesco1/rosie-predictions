@@ -1,134 +1,160 @@
 // pages/index.js
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import LoginButton from '../components/auth/LoginButton';
 import UserProfile from '../components/auth/UserProfile';
+import CreatePredictionForm from '../components/prediction/CreatePredictionForm.js';
+import PredictionList from '../components/prediction/PredictionList.js';
 import { isAuthenticated } from '../utils/auth';
-// import './index.css';
-
+import { handleTwitchCallback } from '../services/api';
+import { setUserData } from '../utils/auth';
+import "../styles/global.css";
 
 export default function Home() {
-    const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Connecting to Twitch...");
 
-    useEffect(() => {
-        // Check if the user is authenticated
-        const checkAuth = () => {
-            setAuthenticated(isAuthenticated());
-        };
+  // Check for authentication token initially
+  useEffect(() => {
+    setAuthenticated(isAuthenticated());
+  }, []);
 
-        checkAuth();
-    }, []);
+  // Check for auth process in progress
+  useEffect(() => {
+    const checkAuthInProgress = async () => {
+      // Skip if already authenticated
+      if (authenticated) return;
 
-    return (
-        <div className="container">
-            <Head>
-                <title>Twitch Predictions Manager</title>
-                <meta name="description" content="Manage your Twitch predictions" />
-                <link rel="icon" href="/favicon.ico" />
-            </Head>
+      // Check if there's an auth code from the callback
+      if (typeof window !== 'undefined') {
+        const authCode = sessionStorage.getItem('twitch_auth_code');
+        const authInProgress = sessionStorage.getItem('auth_in_progress');
+        const authError = sessionStorage.getItem('twitch_auth_error');
 
-            <main className="main">
-                <h1 className="title">
-                    Twitch Predictions Manager
-                </h1>
+        if (authInProgress === 'true' && authCode) {
+          try {
+            // Show loading screen
+            setIsLoading(true);
+            setLoadingMessage("Connection successful! Finalizing...");
 
-                <p className="description">
-                    Create and manage predictions for your Twitch channel
-                </p>
+            // Process the authentication
+            const userData = await handleTwitchCallback(authCode);
 
-                {authenticated ? (
-                    <>
-                        <UserProfile onLogout={() => setAuthenticated(false)} />
-                        <div className="content">
-                            <p>You are now logged in! Soon you&apos;ll be able to manage your predictions here.</p>
-                        </div>
-                    </>
-                ) : (
-                    <div className="auth-section">
-                        <p>Please login with your Twitch account to get started:</p>
-                        <LoginButton />
-                    </div>
-                )}
-            </main>
+            // Save the user data
+            setUserData(userData);
 
-            <footer className="footer">
-                <a
-                    href="https://github.com/yourusername/twitch-predictions-manager"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Created with Next.js, Spring Boot, and Electron
-                </a>
-            </footer>
+            // Update status
+            setLoadingMessage("Authentication complete!");
 
-            <style jsx>{`
-        .container {
-          min-height: 100vh;
-          padding: 0 0.5rem;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
+            // Update authentication state
+            setAuthenticated(true);
+
+            // Clean up session storage
+            sessionStorage.removeItem('twitch_auth_code');
+            sessionStorage.removeItem('auth_in_progress');
+
+            // Hide loading after a moment
+            setTimeout(() => {
+              setIsLoading(false);
+            }, 1500);
+          } catch (error) {
+            console.error('Auth error:', error);
+            setLoadingMessage("Authentication failed. Please try again.");
+
+            // Clean up session storage
+            sessionStorage.removeItem('twitch_auth_code');
+            sessionStorage.removeItem('auth_in_progress');
+
+            // Hide loading after showing error
+            setTimeout(() => {
+              setIsLoading(false);
+            }, 2000);
+          }
+        } else if (authError) {
+          // Handle auth error
+          setIsLoading(true);
+          setLoadingMessage(`Authentication error: ${authError}. Please try again.`);
+
+          // Clean up session storage
+          sessionStorage.removeItem('twitch_auth_error');
+
+          // Hide loading after showing error
+          setTimeout(() => {
+            setIsLoading(false);
+          }, 2000);
         }
+      }
+    };
 
-        .main {
-          padding: 5rem 0;
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          width: 100%;
-          max-width: 800px;
-        }
+    checkAuthInProgress();
+  }, [authenticated]);
 
-        .footer {
-          width: 100%;
-          height: 100px;
-          border-top: 1px solid #eaeaea;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
+  return (
+    <div className="container">
+      <Head>
+        <title>Twitch Predictions Manager</title>
+        <meta name="description" content="Manage your Twitch predictions" />
+        <link rel="icon" href="/favicon.ico" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
+        <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet" />
+      </Head>
+      <main>
+        {authenticated ? (
+          <>
+            <UserProfile onLogout={() => setAuthenticated(false)} />
+            <CreatePredictionForm />
+            <PredictionList />
+          </>
+        ) : (<>
+          <div className='title-container'>
+            <h1 className='title-text'>Twitch </h1>&nbsp;<p className='title-text-period'>.</p><h1 className='title-text'>Predictions</h1>
+          </div>
+          <div className="login-container">
+            <div className="hero-image-container">
+              <Image
+                src="/images/test.PNG"
+                alt="Twitch Predictions Hero"
+                width={500}
+                height={300}
+                layout="responsive"
+              />
+            </div>
+            <div className="hero-text-container">
+              <h2 className="pixelify-sans-heading">Start</h2>
+              <p className="pixelify-sans-body">Predictions</p>
+            </div>
+            <LoginButton setLoading={setIsLoading} setLoadingMessage={setLoadingMessage} />
+          </div>
+        </>
+        )}
+      </main>
 
-        .title {
-          margin: 0;
-          line-height: 1.15;
-          font-size: 4rem;
-          text-align: center;
-        }
-
-        .description {
-          line-height: 1.5;
-          font-size: 1.5rem;
-          text-align: center;
-        }
-
-        .auth-section {
-          margin-top: 2rem;
-          text-align: center;
-        }
-
-        .content {
-          width: 100%;
-          margin-top: 2rem;
-        }
-      `}</style>
-
-            <style jsx global>{`
-        html,
-        body {
-          padding: 0;
-          margin: 0;
-          font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto,
-            Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue,
-            sans-serif;
-        }
-
-        * {
-          box-sizing: border-box;
-        }
-      `}</style>
+      {isLoading && (
+        <div className="global-loading-overlay">
+          <div className="global-loading-content">
+            <div className="loading-gif-container">
+              <Image
+                src="/images/FLOPPYFISHROSIE.gif"
+                alt="Loading..."
+                width={150}
+                height={150}
+                priority
+              />
+            </div>
+            <p className="pixelify-sans-body loading-text">{loadingMessage}</p>
+          </div>
         </div>
-    );
+      )}
+
+      <footer
+        href="https://github.com/yourusername/twitch-predictions-manager"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+      </footer>
+    </div>
+  );
 }

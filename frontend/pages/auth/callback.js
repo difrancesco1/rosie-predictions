@@ -1,84 +1,100 @@
 // pages/auth/callback.js
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { handleTwitchCallback } from '../../services/api';
-import { setUserData } from '../../utils/auth';
+import Head from 'next/head';
+import Image from 'next/image';
 
 export default function AuthCallback() {
     const router = useRouter();
-    const [status, setStatus] = useState('Waiting for authentication data...');
-    const [error, setError] = useState(null);
 
     useEffect(() => {
-        // Function to process the authentication code
-        const processAuth = async (code) => {
-            try {
-                setStatus('Finalizing authentication...');
-                console.log('Processing auth code:', code);
+        if (router.isReady) {
+            // Check if we have the auth code
+            if (router.query.code) {
+                // Store auth code in sessionStorage
+                sessionStorage.setItem('twitch_auth_code', router.query.code);
+                sessionStorage.setItem('auth_in_progress', 'true');
 
-                // Send the code to our backend
-                const userData = await handleTwitchCallback(code);
-                console.log('Received user data:', userData);
+                // Detect if we're in a popup window
+                const isPopup = window.opener && window.opener !== window;
 
-                // Save the user data
-                setUserData(userData);
+                if (isPopup) {
+                    // If we're in a popup, just close the window after saving the code
+                    // The main window will detect this and continue the auth process
+                    window.close();
+                } else {
+                    // If we're not in a popup, redirect back to the main page
+                    router.replace('/');
+                }
+            } else if (router.query.error) {
+                // Store error in sessionStorage
+                sessionStorage.setItem('twitch_auth_error', router.query.error);
 
-                setStatus('Authentication successful! Redirecting...');
+                // Check if we're in a popup
+                const isPopup = window.opener && window.opener !== window;
 
-                // Redirect to the main page
-                setTimeout(() => {
-                    router.push('/');
-                }, 1500);
-            } catch (error) {
-                console.error('Auth callback error:', error);
-                setError('Authentication failed. Please try again.');
-                setStatus('');
+                if (isPopup) {
+                    // Close the popup on error
+                    window.close();
+                } else {
+                    // Redirect back to home page
+                    router.replace('/');
+                }
             }
-        };
-
-        // Process once the router is ready and we have the code
-        if (router.isReady && router.query.code) {
-            processAuth(router.query.code);
-        } else if (router.isReady && router.query.error) {
-            setError(`Authentication error: ${router.query.error}`);
-            setStatus('');
         }
-    }, [router.isReady, router.query]);
+    }, [router.isReady, router.query, router]);
 
+    // Return a loading screen
     return (
-        <div className="auth-callback-container">
-            <h1>Twitch Authentication</h1>
-            {status && <div className="status-message">{status}</div>}
-            {error && <div className="error-message">{error}</div>}
-
-            <style jsx>{`
-        .auth-callback-container {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          min-height: 100vh;
-          padding: 20px;
-          text-align: center;
-        }
-        
-        .status-message {
-          margin-top: 20px;
-          padding: 10px;
-          border-radius: 4px;
-          background-color: #f5f5f5;
-          max-width: 400px;
-        }
-        
-        .error-message {
-          margin-top: 20px;
-          padding: 10px;
-          border-radius: 4px;
-          background-color: #ffebee;
-          color: #d32f2f;
-          max-width: 400px;
-        }
-      `}</style>
-        </div>
+        <>
+            <Head>
+                <title>Authenticating...</title>
+                <link rel="preconnect" href="https://fonts.googleapis.com" />
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin />
+                <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet" />
+                <style>{`
+          body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+          }
+          .fullscreen-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgb(254,254,254);
+            background: linear-gradient(180deg, rgba(254,254,254,1) 7%, rgba(217,255,146,1) 80%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+          }
+          .loading-text {
+            font-family: "Pixelify Sans", sans-serif;
+            font-weight: 400;
+            font-size: 18px;
+            color: #9146FF;
+            margin-top: 15px;
+          }
+        `}</style>
+            </Head>
+            <div className="fullscreen-loader">
+                <div>
+                    <Image
+                        src="/images/FLOPPYFISHROSIE.gif"
+                        alt="Loading..."
+                        width={150}
+                        height={150}
+                        priority
+                    />
+                </div>
+                <p className="loading-text">Processing authorization...</p>
+            </div>
+        </>
     );
 }

@@ -1,0 +1,61 @@
+.userProfile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 10px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  width: 90%;
+  min-height: 20px; 
+}
+
+.profileButton {
+  color: black;
+  border: none;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.2s;
+}
+
+.profileButton:hover {
+}
+
+.profileContent {
+  display: none;
+  flex-grow: 1; 
+  justify-content: space-between;
+  align-items: center;
+}
+
+.expanded {
+  display: flex; 
+}
+
+.userInfo h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.logoutButton {
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.logoutButton:hover {
+  background-color: #b71c1c;
+}
+
+.logoutButton:disabled {
+  background-color: #e57373;
+  cursor: not-allowed;
+}

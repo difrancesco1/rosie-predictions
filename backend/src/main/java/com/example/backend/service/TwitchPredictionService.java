@@ -38,6 +38,7 @@ public class TwitchPredictionService {
     private PredictionSessionRepository sessionRepository;
 
     private static final String TWITCH_API_URL = "https://api.twitch.tv/helix";
+    private static final int TWITCH_MAX_LIMIT = 25; // Twitch API maximum limit
 
     public List<Prediction> getPredictions(String userId, int limit) {
         String accessToken = authService.getValidAccessToken(userId);
@@ -49,23 +50,64 @@ public class TwitchPredictionService {
         HttpHeaders headers = createHeaders(accessToken);
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<Map> response = restTemplate.exchange(
-                TWITCH_API_URL + "/predictions?broadcaster_id=" + userId + "&first=" + limit,
-                HttpMethod.GET,
-                entity,
-                Map.class);
+        // Use pagination to get more than 25 predictions if needed
+        List<Prediction> allPredictions = new ArrayList<>();
+        String cursor = null;
+        int remaining = limit;
 
-        List<Map<String, Object>> predictionData = (List<Map<String, Object>>) response.getBody().get("data");
-        List<Prediction> predictions = new ArrayList<>();
+        do {
+            // Cap the request limit to Twitch's maximum (25)
+            int requestLimit = Math.min(remaining, TWITCH_MAX_LIMIT);
 
-        for (Map<String, Object> data : predictionData) {
-            Prediction prediction = mapToPrediction(data);
-            predictions.add(prediction);
-            @SuppressWarnings("unchecked")
-            Prediction savedPrediction = (Prediction) predictionRepository.save(prediction);
-        }
+            // Build the URL with pagination if needed
+            StringBuilder urlBuilder = new StringBuilder(TWITCH_API_URL)
+                    .append("/predictions?broadcaster_id=")
+                    .append(userId)
+                    .append("&first=")
+                    .append(requestLimit);
 
-        return predictions;
+            if (cursor != null) {
+                urlBuilder.append("&after=").append(cursor);
+            }
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    urlBuilder.toString(),
+                    HttpMethod.GET,
+                    entity,
+                    Map.class);
+
+            // Process the current page of results
+            Map<String, Object> responseBody = response.getBody();
+            List<Map<String, Object>> predictionData = (List<Map<String, Object>>) responseBody.get("data");
+
+            if (predictionData != null && !predictionData.isEmpty()) {
+                for (Map<String, Object> data : predictionData) {
+                    Prediction prediction = mapToPrediction(data);
+                    allPredictions.add(prediction);
+                    predictionRepository.save(prediction);
+                }
+
+                // Update the remaining count
+                remaining -= predictionData.size();
+
+                // Check if we need to get more pages
+                if (remaining > 0 && responseBody.containsKey("pagination")) {
+                    Map<String, Object> pagination = (Map<String, Object>) responseBody.get("pagination");
+                    cursor = pagination.containsKey("cursor") ? (String) pagination.get("cursor") : null;
+
+                    // If no cursor, we've reached the end
+                    if (cursor == null) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                break; // No data returned
+            }
+        } while (remaining > 0);
+
+        return allPredictions;
     }
 
     public Prediction createPrediction(String userId, String title, String sessionId, List<String> outcomes,
