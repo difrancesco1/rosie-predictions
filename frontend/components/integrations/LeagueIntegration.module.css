@@ -49,11 +49,6 @@
     border: 1px solid #e0e0e0;
 }
 
-.activeAccount {
-    border-color: #9146FF;
-    border-width: 2px;
-}
-
 .accountInfo {
     display: flex;
     justify-content: space-between;
@@ -64,14 +59,6 @@
 .summonerName {
     font-weight: bold;
     font-size: 14px;
-}
-
-.activeLabel {
-    background-color: #9146FF;
-    color: white;
-    padding: 3px 8px;
-    border-radius: 10px;
-    font-size: 11px;
 }
 
 .accountActions {

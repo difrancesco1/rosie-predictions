@@ -10,10 +10,16 @@ import java.util.UUID;
 
 @Repository
 public interface LeagueAccountRepository extends JpaRepository<LeagueAccount, UUID> {
-    // Find all accounts for a user
-    List<LeagueAccount> findByUserId(String userId);
 
-    // Find by summoner name (for checking duplicates)
+    void deleteByUserId(String userId);
+
+    // Find all accounts for a user
+    List<LeagueAccount> findAllByUserId(String userId);
+
+    // Find a specific account by ID and user ID
+    Optional<LeagueAccount> findByIdAndUserId(UUID id, String userId);
+
+    // Find by summoner name
     Optional<LeagueAccount> findBySummonerName(String summonerName);
 
     // Find active account for a user
@@ -23,4 +29,5 @@ public interface LeagueAccountRepository extends JpaRepository<LeagueAccount, UU
     List<LeagueAccount> findByAutoCreatePredictionsTrueAndIsActiveTrue();
 
     List<LeagueAccount> findByAutoResolvePredictionsTrueAndIsActiveTrue();
+
 }

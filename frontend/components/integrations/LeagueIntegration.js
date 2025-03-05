@@ -1,10 +1,8 @@
-// components/integrations/LeagueIntegration.js
+// Modified version of LeagueIntegration.js
 import { useState, useEffect } from 'react';
 import {
     connectLeagueAccount,
     getAllLeagueAccounts,
-    getActiveLeagueAccount,
-    setAccountActive,
     updateLeagueSettings,
     disconnectLeagueAccount
 } from '../../services/leagueApi';
@@ -13,8 +11,7 @@ import styles from './LeagueIntegration.module.css';
 export default function LeagueIntegration() {
     const [summonerName, setSummonerName] = useState('');
     const [accounts, setAccounts] = useState([]);
-    const [activeAccount, setActiveAccount] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true); // Start with loading state
     const [error, setError] = useState(null);
     const [showConnectForm, setShowConnectForm] = useState(false);
 
@@ -31,13 +28,11 @@ export default function LeagueIntegration() {
             // Get all accounts
             const allAccounts = await getAllLeagueAccounts();
             setAccounts(allAccounts || []);
-
-            // Get active account
-            const active = await getActiveLeagueAccount();
-            setActiveAccount(active);
         } catch (err) {
             console.error('Error fetching accounts:', err);
             setError('Failed to load accounts. Please try again.');
+            // Ensure accounts is an array even on error
+            setAccounts([]);
         } finally {
             setIsLoading(false);
         }
@@ -72,24 +67,12 @@ export default function LeagueIntegration() {
         }
     };
 
-    const handleSetActive = async (accountId) => {
-        try {
-            setIsLoading(true);
-            setError(null);
-
-            // Set account as active
-            const updatedAccount = await setAccountActive(accountId);
-
-            // Reload accounts to reflect changes
-            await loadAccountsData();
-        } catch (err) {
-            setError('Failed to set active account: ' + (err.message || 'Unknown error'));
-        } finally {
-            setIsLoading(false);
+    const handleUpdateSettings = async (account, settingName, value) => {
+        if (!account || !account.id) {
+            console.error('Invalid account data:', account);
+            return;
         }
-    };
 
-    const handleUpdateSettings = async (accountId, settingName, value) => {
         try {
             setIsLoading(true);
             setError(null);
@@ -99,7 +82,7 @@ export default function LeagueIntegration() {
             settings[settingName] = value;
 
             // Update settings
-            await updateLeagueSettings(accountId, settings);
+            await updateLeagueSettings(account.id, settings);
 
             // Reload accounts to reflect changes
             await loadAccountsData();
@@ -110,7 +93,12 @@ export default function LeagueIntegration() {
         }
     };
 
-    const handleDisconnect = async (accountId) => {
+    const handleDisconnect = async (account) => {
+        if (!account || !account.id) {
+            console.error('Invalid account data:', account);
+            return;
+        }
+
         if (!window.confirm('Are you sure you want to disconnect this account?')) {
             return;
         }
@@ -120,7 +108,7 @@ export default function LeagueIntegration() {
             setError(null);
 
             // Disconnect account
-            await disconnectLeagueAccount(accountId);
+            await disconnectLeagueAccount(account.id);
 
             // Reload accounts
             await loadAccountsData();
@@ -131,6 +119,7 @@ export default function LeagueIntegration() {
         }
     };
 
+    // Show loading state
     if (isLoading && accounts.length === 0) {
         return (
             <div className={styles.leagueIntegration}>
@@ -149,85 +138,81 @@ export default function LeagueIntegration() {
             )}
 
             {/* Accounts list section */}
-            {accounts.length > 0 && (
+            {accounts && accounts.length > 0 && (
                 <div className={styles.accountsList}>
                     <h4 className={styles.sectionTitle}>Connected Accounts</h4>
 
-                    {accounts.map(account => (
-                        <div
-                            key={account.id}
-                            className={`${styles.accountItem} ${account.active ? styles.activeAccount : ''}`}
-                        >
-                            <div className={styles.accountInfo}>
-                                <div className={styles.summonerName}>{account.summonerName}</div>
-                                {account.active && <div className={styles.activeLabel}>Active</div>}
-                            </div>
+                    <div className={styles.accountsContainer}>
+                        {accounts.map(account => {
+                            // Skip rendering if account is null or missing required properties
+                            if (!account || !account.id) return null;
 
-                            <div className={styles.accountActions}>
-                                {!account.active && (
-                                    <button
-                                        className={styles.actionButton}
-                                        onClick={() => handleSetActive(account.id)}
-                                        disabled={isLoading}
-                                    >
-                                        Set Active
-                                    </button>
-                                )}
-
-                                <button
-                                    className={`${styles.actionButton} ${styles.disconnectButton}`}
-                                    onClick={() => handleDisconnect(account.id)}
-                                    disabled={isLoading}
+                            return (
+                                <div
+                                    key={account.id}
+                                    className={styles.accountItem}
                                 >
-                                    Disconnect
-                                </button>
-                            </div>
-
-                            {account.active && (
-                                <div className={styles.accountSettings}>
-                                    <div className={styles.settingRow}>
-                                        <span>Auto-create predictions</span>
-                                        <div className={styles.toggle}>
-                                            <input
-                                                type="checkbox"
-                                                id={`create-${account.id}`}
-                                                checked={account.autoCreatePredictions}
-                                                onChange={(e) => handleUpdateSettings(
-                                                    account.id,
-                                                    'autoCreatePredictions',
-                                                    e.target.checked
-                                                )}
-                                                disabled={isLoading}
-                                            />
-                                            <span className={styles.slider}></span>
+                                    <div className={styles.accountInfo}>
+                                        <div className={styles.summonerName}>
+                                            {account.summonerName || 'Unknown Summoner'}
                                         </div>
                                     </div>
 
-                                    <div className={styles.settingRow}>
-                                        <span>Auto-resolve predictions</span>
-                                        <div className={styles.toggle}>
-                                            <input
-                                                type="checkbox"
-                                                id={`resolve-${account.id}`}
-                                                checked={account.autoResolvePredictions}
-                                                onChange={(e) => handleUpdateSettings(
-                                                    account.id,
-                                                    'autoResolvePredictions',
-                                                    e.target.checked
-                                                )}
-                                                disabled={isLoading}
-                                            />
-                                            <span className={styles.slider}></span>
+                                    <div className={styles.accountSettings}>
+                                        <div className={styles.settingRow}>
+                                            <span>Auto-create predictions</span>
+                                            <div className={styles.toggle}>
+                                                <input
+                                                    type="checkbox"
+                                                    id={`create-${account.id}`}
+                                                    checked={account.autoCreatePredictions || false}
+                                                    onChange={(e) => handleUpdateSettings(
+                                                        account,
+                                                        'autoCreatePredictions',
+                                                        e.target.checked
+                                                    )}
+                                                    disabled={isLoading}
+                                                />
+                                                <span className={styles.slider}></span>
+                                            </div>
                                         </div>
+
+                                        <div className={styles.settingRow}>
+                                            <span>Auto-resolve predictions</span>
+                                            <div className={styles.toggle}>
+                                                <input
+                                                    type="checkbox"
+                                                    id={`resolve-${account.id}`}
+                                                    checked={account.autoResolvePredictions || false}
+                                                    onChange={(e) => handleUpdateSettings(
+                                                        account,
+                                                        'autoResolvePredictions',
+                                                        e.target.checked
+                                                    )}
+                                                    disabled={isLoading}
+                                                />
+                                                <span className={styles.slider}></span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className={styles.accountActions}>
+                                        <button
+                                            className={`${styles.actionButton} ${styles.disconnectButton}`}
+                                            onClick={() => handleDisconnect(account)}
+                                            disabled={isLoading}
+                                        >
+                                            Disconnect
+                                        </button>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    ))}
+                            );
+                        })}
+                    </div>
                 </div>
             )}
 
-            {/* Connect form */}
+            {/* Connect form or Add button */}
             {showConnectForm ? (
                 <form onSubmit={handleConnect} className={styles.connectForm}>
                     <div className={styles.inputGroup}>
