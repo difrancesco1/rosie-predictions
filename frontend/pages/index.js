@@ -6,15 +6,18 @@ import LoginButton from '../components/auth/LoginButton';
 import UserProfile from '../components/auth/UserProfile';
 import CreatePredictionForm from '../components/prediction/CreatePredictionForm.js';
 import PredictionList from '../components/prediction/PredictionList.js';
+import LeagueIntegration from '../components/integrations/LeagueIntegration.js';
 import { isAuthenticated } from '../utils/auth';
 import { handleTwitchCallback } from '../services/api';
 import { setUserData } from '../utils/auth';
+import styles from '../styles/TabNavigation.module.css';
 import "../styles/global.css";
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Connecting to Twitch...");
+  const [activeTab, setActiveTab] = useState('create'); // 'create', 'list', 'league'
 
   // Check for authentication token initially
   useEffect(() => {
@@ -91,6 +94,14 @@ export default function Home() {
     checkAuthInProgress();
   }, [authenticated]);
 
+  // Function to handle prediction creation success
+  const handlePredictionCreated = () => {
+    // Optionally switch to prediction list after creation
+    // setActiveTab('list');
+
+    // Or just trigger a refresh of the prediction list if needed
+  };
+
   return (
     <div className="container">
       <Head>
@@ -105,8 +116,43 @@ export default function Home() {
         {authenticated ? (
           <>
             <UserProfile onLogout={() => setAuthenticated(false)} />
-            <CreatePredictionForm />
-            <PredictionList />
+
+            {/* Tab navigation */}
+            <div className={styles.tabButtons}>
+              <button
+                className={`${styles.tabButton} ${activeTab === 'create' ? styles.activeTab : ''}`}
+                onClick={() => setActiveTab('create')}
+              >
+                Create
+              </button>
+              <button
+                className={`${styles.tabButton} ${activeTab === 'list' ? styles.activeTab : ''}`}
+                onClick={() => setActiveTab('list')}
+              >
+                Predictions
+              </button>
+              <button
+                className={`${styles.tabButton} ${activeTab === 'league' ? styles.activeTab : ''}`}
+                onClick={() => setActiveTab('league')}
+              >
+                League
+              </button>
+            </div>
+
+            {/* Content container */}
+            <div className={styles.contentContainer}>
+              {activeTab === 'create' && (
+                <CreatePredictionForm onSuccess={handlePredictionCreated} />
+              )}
+
+              {activeTab === 'list' && (
+                <PredictionList />
+              )}
+
+              {activeTab === 'league' && (
+                <LeagueIntegration />
+              )}
+            </div>
           </>
         ) : (<>
           <div className='title-container'>

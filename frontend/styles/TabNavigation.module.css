@@ -1,0 +1,54 @@
+/* styles/TabNavigation.module.css */
+.tabButtons {
+    display: flex;
+    position: absolute;
+    left: 8px;
+    bottom: 0;
+    margin: 15px 0;
+    background: #fff;
+    border-radius: 8px;
+    padding: 3px;
+    box-shadow: 0 2px 4px #0000001a;
+    width: calc(100% - 20px);
+    max-width: 320px;
+}
+
+.tabButton {
+    flex: 1;
+    padding: 10px 0;
+    background: none;
+    border: none;
+    font-family: "Pixelify Sans", sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.2s ease;
+}
+
+.tabButton:hover {
+    background-color: #f0f0f0;
+}
+
+.activeTab {
+    background-color: #9146FF;
+    color: white;
+    box-shadow: 0 2px 4px rgba(145, 70, 255, 0.3);
+}
+
+.activeTab:hover {
+    background-color: #8134e0;
+}
+
+.contentContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 90%;
+    max-height: calc(100vh - 300px);
+    overflow-y: auto;
+    position: absolute;
+    bottom: 50px;
+    left: 20px;
+}

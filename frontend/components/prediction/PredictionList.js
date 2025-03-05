@@ -1,4 +1,3 @@
-// components/predictions/PredictionList.js
 import { useState, useEffect } from 'react';
 import { getPredictions } from '../../services/predictions.js';
 import PredictionCard from './PredictionCard';
@@ -14,7 +13,7 @@ export default function PredictionList() {
         setError(null);
 
         try {
-            const data = await getPredictions(50); // Get last 50 predictions
+            const data = await getPredictions(50); // get (50) most recent predictions
             setPredictions(data);
         } catch (error) {
             setError(error.message || 'Failed to load predictions');
