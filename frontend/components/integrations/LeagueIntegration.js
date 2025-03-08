@@ -68,23 +68,28 @@ export default function LeagueIntegration() {
     };
 
     const handleUpdateSettings = async (account, settingName, value) => {
+        if (!account || !account.id) {
+            console.error('Invalid account data:', account);
+            return;
+        }
+
         try {
             setIsLoading(true);
             setError(null);
 
-            console.log(`Updating ${settingName} to ${value} for account ${account.id}`);
-
-            // Prepare settings object
             const settings = {};
-            settings[settingName] = value;
+            if (settingName === 'autoCreatePredictions') {
+                settings.autoCreatePredictions = value;
+                settings.autoResolvePredictions = account.autoResolvePredictions;
+            } else if (settingName === 'autoResolvePredictions') {
+                settings.autoResolvePredictions = value;
+                settings.autoCreatePredictions = account.autoCreatePredictions;
+            }
 
-            // Update settings
             await updateLeagueSettings(account.id, settings);
 
-            // Reload accounts to reflect changes
             await loadAccountsData();
         } catch (err) {
-            console.error('Error updating settings:', err);
             setError('Failed to update settings: ' + (err.message || 'Unknown error'));
         } finally {
             setIsLoading(false);

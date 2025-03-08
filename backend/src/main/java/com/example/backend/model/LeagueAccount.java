@@ -23,6 +23,7 @@ public class LeagueAccount {
     private LocalDateTime lastGameCheckTime;
     private String region;
     private boolean isActive;
+    private UUID activeTemplateId;
 
     public LeagueAccount() {
     }
@@ -114,5 +115,13 @@ public class LeagueAccount {
 
     public void setActive(boolean active) {
         isActive = active;
+    }
+
+    public UUID getActiveTemplateId() {
+        return activeTemplateId;
+    }
+
+    public void setActiveTemplateId(UUID activeTemplateId) {
+        this.activeTemplateId = activeTemplateId;
     }
 }

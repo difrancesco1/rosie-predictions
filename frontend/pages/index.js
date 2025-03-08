@@ -6,9 +6,11 @@ import LoginButton from '../components/auth/LoginButton';
 import UserProfile from '../components/auth/UserProfile';
 import CreatePredictionForm from '../components/prediction/CreatePredictionForm.js';
 import PredictionList from '../components/prediction/PredictionList.js';
+import TemplateManager from '../components/prediction/TemplateManager.js';
 import LeagueIntegration from '../components/integrations/LeagueIntegration.js';
 import BottomNavigation from '../components/navigation/BottomNavigation';
 import SlideUpModal from '../components/navigation/SlideUpModal';
+import MockToggle from '../components/MockToggle';
 import { isAuthenticated } from '../utils/auth';
 import { handleTwitchCallback } from '../services/api';
 import { setUserData } from '../utils/auth';
@@ -103,6 +105,7 @@ export default function Home() {
     const titles = {
       create: 'Create Prediction',
       list: 'Your Predictions',
+      templates: 'Prediction Templates',
       league: 'League Integration'
     };
     setModalTitle(titles[contentType]);
@@ -127,6 +130,8 @@ export default function Home() {
         return <CreatePredictionForm onSuccess={handlePredictionCreated} />;
       case 'list':
         return <PredictionList />;
+      case 'templates':
+        return <TemplateManager />;
       case 'league':
         return <LeagueIntegration />;
       default:
@@ -145,6 +150,9 @@ export default function Home() {
         <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Pixelify+Sans:wght@400..700&display=swap" rel="stylesheet" />
       </Head>
       <main>
+        {/* Add MockToggle component here, it will only show in mock mode */}
+        <MockToggle />
+
         {authenticated ? (
           <>
             <UserProfile onLogout={() => setAuthenticated(false)} />

@@ -1,302 +1,437 @@
 package com.example.backend.service;
 
+import com.example.backend.config.LeagueConfig;
+import com.example.backend.model.LeagueAccount;
+import com.example.backend.model.Prediction;
+import com.example.backend.model.PredictionTemplate;
+import com.example.backend.repository.LeagueAccountRepository;
+import com.example.backend.repository.PredictionTemplateRepository;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-
-import com.example.backend.model.LeagueAccount;
-import com.example.backend.model.Prediction;
-import com.example.backend.repository.LeagueAccountRepository;
-import com.example.backend.config.LeagueConfig;
-
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-/**
- * Service for interacting with the Riot League of Legends API
- */
+import java.time.LocalDateTime;
+import java.util.*;
+
 @Service
 public class LeagueService {
     private static final Logger logger = LoggerFactory.getLogger(LeagueService.class);
 
     private final LeagueAccountRepository leagueAccountRepository;
     private final TwitchPredictionService predictionService;
-    private final ObjectMapper objectMapper;
-    private final RestTemplate restTemplate;
     private final LeagueConfig leagueConfig;
+    private final RestTemplate restTemplate;
+
+    // Simple class to track game and prediction info
+    private static class GameTracker {
+        String summonerId;
+        String userId;
+        String gameId;
+        String predictionId;
+        boolean inGame;
+
+        public GameTracker(String summonerId, String userId, String gameId, String predictionId) {
+            this.summonerId = summonerId;
+            this.userId = userId;
+            this.gameId = gameId;
+            this.predictionId = predictionId;
+            this.inGame = true;
+        }
+    }
+
+    // Map to track active games by summoner ID
+    private final Map<String, GameTracker> activeGames = new HashMap<>();
+    @Autowired
+    private PredictionTemplateRepository templateRepository;
 
     @Autowired
     public LeagueService(LeagueAccountRepository leagueAccountRepository,
             TwitchPredictionService predictionService,
-            RestTemplate restTemplate,
-            LeagueConfig leagueConfig) {
+            LeagueConfig leagueConfig,
+            RestTemplate restTemplate) {
         this.leagueAccountRepository = leagueAccountRepository;
         this.predictionService = predictionService;
-        this.restTemplate = restTemplate;
         this.leagueConfig = leagueConfig;
-        this.objectMapper = new ObjectMapper();
+        this.restTemplate = restTemplate;
     }
 
     /**
-     * Save or update a League account
+     * Connect a Twitch user's account to their League of Legends summoner name
      */
-    public LeagueAccount saveAccount(LeagueAccount account) {
+    public LeagueAccount connectAccount(String userId, String summonerName) {
+        logger.info("Connecting account for userId: {}, summonerName: {}", userId, summonerName);
+
+        // Deactivate all existing accounts for this user
+        deactivateAllAccounts(userId);
+
+        // Create new account
+        LeagueAccount account = new LeagueAccount(userId, summonerName);
+
+        // In a real implementation, we would call the Riot API to get these IDs
+        // For mock mode, we'll use generated values
+        account.setSummonerId("test-summoner-id-" + System.currentTimeMillis());
+        account.setPuuid("test-puuid-" + System.currentTimeMillis());
+        account.setRegion("na1");
+        account.setActive(true); // Set the new account as active
+
         return leagueAccountRepository.save(account);
     }
 
     /**
-     * Get all League accounts for a user
+     * Deactivate all accounts for a user
      */
-    public List<LeagueAccount> getAccountsByUserId(String userId) {
+    private void deactivateAllAccounts(String userId) {
+        List<LeagueAccount> accounts = leagueAccountRepository.findAllByUserId(userId);
+
+        if (accounts != null) {
+            for (LeagueAccount account : accounts) {
+                if (account != null) {
+                    account.setActive(false);
+                    leagueAccountRepository.save(account);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get all accounts for a user
+     */
+    public List<LeagueAccount> getAllAccountsByUserId(String userId) {
         return leagueAccountRepository.findAllByUserId(userId);
     }
 
     /**
-     * Delete a League account
+     * Get active account for a user
      */
-    public void deleteAccount(UUID id) {
-        leagueAccountRepository.deleteById(id);
+    public Optional<LeagueAccount> getActiveAccountByUserId(String userId) {
+        return leagueAccountRepository.findByUserIdAndIsActiveTrue(userId);
+    }
+
+    /**
+     * Get specific account by ID
+     */
+    public Optional<LeagueAccount> getAccountById(UUID accountId) {
+        return leagueAccountRepository.findById(accountId);
+    }
+
+    /**
+     * Set an account as active
+     */
+    public LeagueAccount setAccountActive(String userId, UUID accountId) {
+        // First, deactivate all accounts for this user
+        deactivateAllAccounts(userId);
+
+        // Then, activate the specified account
+        LeagueAccount account = leagueAccountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+
+        // Verify the account belongs to the user
+        if (!account.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Account does not belong to this user");
+        }
+
+        account.setActive(true);
+        return leagueAccountRepository.save(account);
     }
 
     /**
      * Update account settings
      */
-    public LeagueAccount updateAccountSettings(UUID id, boolean autoCreatePredictions, boolean autoResolvePredictions) {
-        LeagueAccount account = leagueAccountRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Account not found"));
+    public LeagueAccount updateAccountSettings(String userId, UUID accountId,
+            boolean autoCreate, boolean autoResolve) {
+        LeagueAccount account = leagueAccountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
 
-        account.setAutoCreatePredictions(autoCreatePredictions);
-        account.setAutoResolvePredictions(autoResolvePredictions);
+        // Verify the account belongs to the user
+        if (!account.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Account does not belong to this user");
+        }
 
+        account.setAutoCreatePredictions(autoCreate);
+        account.setAutoResolvePredictions(autoResolve);
         return leagueAccountRepository.save(account);
     }
 
     /**
-     * Check for new games and create/resolve predictions
+     * Delete a specific League account
      */
+    public void disconnectAccount(String userId, UUID accountId) {
+        LeagueAccount account = leagueAccountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+
+        // Verify the account belongs to the user
+        if (!account.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Account does not belong to this user");
+        }
+
+        leagueAccountRepository.deleteById(accountId);
+    }
+
     @Scheduled(fixedDelayString = "${league.polling-interval:60}000")
-    public void checkForGames() {
-        logger.info("Checking for League games...");
+    public void checkGameStatus() {
+        logger.info("Checking summoner game status...");
 
-        // Find active accounts with auto features enabled
-        List<LeagueAccount> autoCreateAccounts = leagueAccountRepository
-                .findByAutoCreatePredictionsTrueAndIsActiveTrue();
-        List<LeagueAccount> autoResolveAccounts = leagueAccountRepository
-                .findByAutoResolvePredictionsTrueAndIsActiveTrue();
+        List<LeagueAccount> accounts = leagueAccountRepository.findAll();
 
-        // Check for active games and create predictions
-        for (LeagueAccount account : autoCreateAccounts) {
-            try {
-                logger.info("Checking games for account: {}", account.getSummonerName());
-                checkAndCreatePrediction(account);
-            } catch (Exception e) {
-                logger.error("Error checking games for account {}: {}", account.getSummonerName(), e.getMessage());
+        logger.info("Found {} accounts to check", accounts.size());
+
+        for (LeagueAccount account : accounts) {
+            if (!account.isAutoCreatePredictions() && !account.isAutoResolvePredictions()) {
+                continue;
             }
-        }
 
-        // Check for completed games and resolve predictions
-        for (LeagueAccount account : autoResolveAccounts) {
             try {
-                logger.info("Checking for completed games for account: {}", account.getSummonerName());
-                checkAndResolvePrediction(account);
+                processAccount(account);
             } catch (Exception e) {
-                logger.error("Error resolving predictions for account {}: {}", account.getSummonerName(),
-                        e.getMessage());
+                logger.error("Error processing account {}: {}", account.getSummonerName(), e.getMessage(), e);
             }
         }
     }
 
     /**
-     * Check if user is in a game and create a prediction
+     * Process a single account for game status and prediction management
+     * Works with either auto-create OR auto-resolve being enabled
      */
-    private void checkAndCreatePrediction(LeagueAccount account) {
+    private void processAccount(LeagueAccount account) {
+        String summonerId = account.getSummonerId();
+        String userId = account.getUserId();
+
+        // Skip accounts that have neither feature enabled
+        if (!account.isAutoCreatePredictions() && !account.isAutoResolvePredictions()) {
+            logger.debug("Account {} has neither auto-create nor auto-resolve enabled - skipping",
+                    account.getSummonerName());
+            return;
+        }
+
+        // Check current game status
+        boolean isInGame = isInGame(account);
+        GameTracker tracker = activeGames.get(summonerId);
+
+        // Special case: if auto-create is disabled but we have an active prediction
+        // that needs resolving
+        if (!account.isAutoCreatePredictions() && account.isAutoResolvePredictions() && tracker != null) {
+            // If player was in game but now isn't, resolve the prediction
+            if (tracker.inGame && !isInGame) {
+                logger.info("Auto-resolve: Summoner {} just finished a game - resolving prediction",
+                        account.getSummonerName());
+                resolveGamePrediction(account, tracker);
+                tracker.inGame = false;
+            }
+            return;
+        }
+
+        // Special case: if auto-resolve is disabled but auto-create is enabled
+        if (account.isAutoCreatePredictions() && !account.isAutoResolvePredictions()) {
+            // If not tracking and in game, create a prediction
+            if (tracker == null && isInGame) {
+                logger.info("Auto-create: Summoner {} just entered a game - creating prediction",
+                        account.getSummonerName());
+                createGamePrediction(account);
+            }
+            return;
+        }
+
+        // If we get here, both auto-create and auto-resolve must be enabled somehow
+        // (maybe through API or future UI changes)
+
+        // Case 1: Not tracking and not in game - do nothing
+        if (tracker == null && !isInGame) {
+            logger.debug("Summoner {} is not in game and not being tracked", account.getSummonerName());
+            return;
+        }
+
+        // Case 2: Not tracking but in game - create prediction
+        if (tracker == null && isInGame) {
+            logger.info("Summoner {} just entered a game - creating prediction", account.getSummonerName());
+            createGamePrediction(account);
+            return;
+        }
+
+        // Case 3: Tracking but not in game - resolve prediction
+        if (tracker != null && !isInGame) {
+            if (tracker.inGame) {
+                logger.info("Summoner {} just finished a game - resolving prediction", account.getSummonerName());
+                resolveGamePrediction(account, tracker);
+                tracker.inGame = false;
+            } else {
+                // Already processed the game end, check for next game
+                if (checkForNewGame(account)) {
+                    logger.info("Summoner {} started a new game after previous one ended",
+                            account.getSummonerName());
+                    // Remove old tracker since we'll create a new one for the new game
+                    activeGames.remove(summonerId);
+                }
+            }
+            return;
+        }
+
+        // Case 4: Tracking and in game - update last check time
+        if (tracker != null && isInGame) {
+            logger.debug("Summoner {} is still in game", account.getSummonerName());
+            account.setLastGameCheckTime(LocalDateTime.now());
+            leagueAccountRepository.save(account);
+        }
+    }
+
+    /**
+     * Check if a summoner has started a new game after their previous game ended
+     */
+    private boolean checkForNewGame(LeagueAccount account) {
+        // For mock mode: 10% chance of finding a new game after previous game ended
+        boolean foundNewGame = Math.random() < 0.1;
+
+        if (foundNewGame && account.isAutoCreatePredictions()) {
+            createGamePrediction(account);
+        }
+
+        return foundNewGame;
+    }
+
+    /**
+     * Check if summoner is in game
+     * In mock mode, this simulates being in game
+     */
+    private boolean isInGame(LeagueAccount account) {
+        String summonerId = account.getSummonerId();
+        GameTracker tracker = activeGames.get(summonerId);
+
+        // If we're tracking this summoner and they're marked as in game
+        if (tracker != null && tracker.inGame) {
+            // 90% chance to still be in game once we've detected a game
+            // This simulates game duration
+            return Math.random() < 0.9;
+        }
+
+        // For summoners not in a tracked game, 20% chance to enter a new game
+        return Math.random() < 0.2;
+    }
+
+    private void createGamePrediction(LeagueAccount account) {
         try {
-            logger.info("Checking if player {} is in a game", account.getSummonerName());
+            String userId = account.getUserId();
+            String summonerId = account.getSummonerId();
+            String summonerName = account.getSummonerName();
 
-            // Build the URL for checking active game
-            String spectatorUrl = leagueConfig.getNaBaseUrl() + "/lol/spectator/v4/active-games/by-summoner/"
-                    + account.getSummonerId();
+            // Create a gameId
+            String gameId = "MOCK-GAME-" + UUID.randomUUID().toString().substring(0, 8);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Riot-Token", leagueConfig.getApiKey());
+            // Check if account has an active template
+            UUID templateId = account.getActiveTemplateId();
 
-            // Make API call to check if player is in an active game
-            ResponseEntity<String> response;
-            try {
-                response = restTemplate.exchange(
-                        spectatorUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-            } catch (HttpClientErrorException.NotFound e) {
-                // No active game found (404 is expected when not in game)
-                return;
+            // Default values if no template is found
+            String title = "Will " + summonerName + " win their game?";
+            List<String> outcomes = Arrays.asList("Win", "Loss");
+            int duration = 30 * 60; // 30 minutes
+
+            // If template ID exists, try to find the template
+            if (templateId != null) {
+                Optional<PredictionTemplate> templateOpt = templateRepository.findById(templateId);
+
+                if (templateOpt.isPresent()) {
+                    PredictionTemplate template = templateOpt.get();
+
+                    // Use template values
+                    title = template.getTitle().replace("{summonerName}", summonerName);
+                    outcomes = Arrays.asList(template.getOutcome1(), template.getOutcome2());
+                    duration = template.getDuration();
+
+                    logger.info("Using template '{}' for prediction", template.getTitle());
+                } else {
+                    logger.warn("Template with ID {} not found, using defaults", templateId);
+                }
             }
 
-            // If we get here, player is in an active game
-            JsonNode gameData = objectMapper.readTree(response.getBody());
-            long gameId = gameData.get("gameId").asLong();
-            String gameMode = gameData.get("gameMode").asText();
-
-            // Check if we already have a prediction running for this game
-            List<Prediction> activePredictions = predictionService.getPredictions(account.getUserId(), 5);
-            boolean predictionExists = activePredictions.stream()
-                    .filter(p -> "ACTIVE".equals(p.getStatus()))
-                    .anyMatch(p -> {
-                        // Check if prediction title contains this game ID (we'll include it for
-                        // tracking)
-                        return p.getTitle().contains("Game #" + gameId);
-                    });
-
-            if (predictionExists) {
-                logger.info("Prediction already exists for game {}", gameId);
-                return;
-            }
-
-            // Create a new prediction for this game
-            logger.info("Creating prediction for {} in game {}", account.getSummonerName(), gameId);
-
-            // Create outcomes - Win or Lose
-            List<String> outcomes = new ArrayList<>();
-            outcomes.add("Win");
-            outcomes.add("Lose");
-
-            // Create prediction title
-            String title = account.getSummonerName() + " - Game #" + gameId;
-
-            // Call the TwitchPredictionService to create the prediction
+            // Create the prediction with template or default values
             Prediction prediction = predictionService.createPrediction(
-                    account.getUserId(),
+                    userId,
                     title,
-                    null, // No session ID
+                    null, // No session
                     outcomes,
-                    300 // 5 minutes prediction window
-            );
+                    duration);
 
-            logger.info("Successfully created prediction {} for game {}", prediction.getId(), gameId);
+            // Start tracking this game
+            if (prediction != null) {
+                GameTracker tracker = new GameTracker(
+                        summonerId,
+                        userId,
+                        gameId,
+                        prediction.getId());
+
+                activeGames.put(summonerId, tracker);
+
+                logger.info("Created prediction {} for {} (game {})",
+                        prediction.getId(), summonerName, gameId);
+            }
+
         } catch (Exception e) {
-            logger.error("Error checking game status for {}: {}", account.getSummonerName(), e.getMessage(), e);
+            logger.error("Error creating game prediction: {}", e.getMessage(), e);
         }
     }
 
     /**
-     * Check for recently completed games and resolve predictions
+     * Resolve a prediction based on game outcome
      */
-    private void checkAndResolvePrediction(LeagueAccount account) {
+    private void resolveGamePrediction(LeagueAccount account, GameTracker tracker) {
         try {
-            // Get active predictions for this user
-            List<Prediction> activePredictions = predictionService.getPredictions(account.getUserId(), 5);
+            // Determine if the player won
+            boolean playerWon = checkGameOutcome(account, tracker.gameId);
 
-            // Filter for active predictions only
-            List<Prediction> ongoingPredictions = activePredictions.stream()
-                    .filter(p -> "ACTIVE".equals(p.getStatus()))
-                    .toList();
+            // Get the prediction
+            Prediction prediction = getPrediction(tracker.userId, tracker.predictionId);
 
-            if (ongoingPredictions.isEmpty()) {
-                return; // No active predictions to resolve
+            if (prediction != null && prediction.getOutcomes().size() >= 2) {
+                // Get the outcome ID based on win/loss
+                // Outcome[0] is "Win", Outcome[1] is "Loss"
+                String outcomeId = playerWon ? prediction.getOutcomes().get(0).getId()
+                        : prediction.getOutcomes().get(1).getId();
+
+                // Resolve the prediction
+                predictionService.endPrediction(
+                        tracker.userId,
+                        tracker.predictionId,
+                        outcomeId);
+
+                logger.info("Resolved prediction {} for {} with outcome: {}",
+                        tracker.predictionId, account.getSummonerName(), playerWon ? "Win" : "Loss");
             }
+        } catch (Exception e) {
+            logger.error("Error resolving prediction: {}", e.getMessage(), e);
+        }
+    }
 
-            // Get recent matches
-            String matchesUrl = leagueConfig.getAmericasBaseUrl() + "/lol/match/v5/matches/by-puuid/" +
-                    account.getPuuid() + "/ids?start=0&count=5";
+    /**
+     * Check the outcome of a game
+     * In mock mode, randomly determine win/loss
+     */
+    private boolean checkGameOutcome(LeagueAccount account, String gameId) {
+        // In mock mode: 50% chance of winning
+        return Math.random() < 0.5;
+    }
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("X-Riot-Token", leagueConfig.getApiKey());
+    /**
+     * Get a prediction by ID
+     */
+    private Prediction getPrediction(String userId, String predictionId) {
+        try {
+            List<Prediction> predictions = predictionService.getPredictions(userId, 50);
 
-            ResponseEntity<String> response = restTemplate.exchange(
-                    matchesUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-
-            JsonNode matchesData = objectMapper.readTree(response.getBody());
-
-            // Check if there are matches
-            if (!matchesData.isArray() || matchesData.size() == 0) {
-                return;
-            }
-
-            // Get most recent match details
-            String matchId = matchesData.get(0).asText();
-
-            // Check if this match is newer than last check time
-            LocalDateTime lastCheck = account.getLastGameCheckTime();
-
-            // Get match details
-            String matchDetailUrl = leagueConfig.getAmericasBaseUrl() + "/lol/match/v5/matches/" + matchId;
-            ResponseEntity<String> matchResponse = restTemplate.exchange(
-                    matchDetailUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
-
-            JsonNode matchDetail = objectMapper.readTree(matchResponse.getBody());
-
-            // Get match end time
-            long gameEndTimestamp = matchDetail.get("info").get("gameEndTimestamp").asLong();
-            LocalDateTime gameEndTime = LocalDateTime.ofInstant(
-                    Instant.ofEpochMilli(gameEndTimestamp), ZoneId.systemDefault());
-
-            // If game ended before last check, we've already processed it
-            if (lastCheck != null && gameEndTime.isBefore(lastCheck)) {
-                return;
-            }
-
-            // Find player in the match
-            JsonNode participants = matchDetail.get("info").get("participants");
-            for (JsonNode participant : participants) {
-                String puuid = participant.get("puuid").asText();
-
-                if (puuid.equals(account.getPuuid())) {
-                    boolean won = participant.get("win").asBoolean();
-
-                    // Find matching prediction
-                    for (Prediction prediction : ongoingPredictions) {
-                        // Extract game ID from prediction title
-                        String title = prediction.getTitle();
-                        if (title.contains("Game #")) {
-                            // Update prediction based on win/loss
-                            String winningOutcomeId = getWinningOutcomeId(prediction, won);
-
-                            if (winningOutcomeId != null) {
-                                predictionService.endPrediction(account.getUserId(), prediction.getId(),
-                                        winningOutcomeId);
-                                logger.info("Resolved prediction {} for game {} with result: {}",
-                                        prediction.getId(), matchId, won ? "Win" : "Loss");
-                            }
-                        }
-                    }
-
-                    // Update last check time
-                    account.setLastGameCheckTime(LocalDateTime.now());
-                    leagueAccountRepository.save(account);
-
-                    break;
+            for (Prediction prediction : predictions) {
+                if (prediction.getId().equals(predictionId)) {
+                    return prediction;
                 }
             }
         } catch (Exception e) {
-            logger.error("Error resolving prediction for {}: {}", account.getSummonerName(), e.getMessage(), e);
+            logger.error("Error getting prediction: {}", e.getMessage(), e);
         }
-    }
 
-    /**
-     * Helper method to find winning outcome ID based on win/loss
-     */
-    private String getWinningOutcomeId(Prediction prediction, boolean won) {
-        for (var outcome : prediction.getOutcomes()) {
-            String title = outcome.getTitle().toLowerCase();
-            if ((won && title.contains("win")) || (!won && title.contains("lose"))) {
-                return outcome.getId();
-            }
-        }
         return null;
     }
 }
