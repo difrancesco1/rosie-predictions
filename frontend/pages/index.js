@@ -7,17 +7,20 @@ import UserProfile from '../components/auth/UserProfile';
 import CreatePredictionForm from '../components/prediction/CreatePredictionForm.js';
 import PredictionList from '../components/prediction/PredictionList.js';
 import LeagueIntegration from '../components/integrations/LeagueIntegration.js';
+import BottomNavigation from '../components/navigation/BottomNavigation';
+import SlideUpModal from '../components/navigation/SlideUpModal';
 import { isAuthenticated } from '../utils/auth';
 import { handleTwitchCallback } from '../services/api';
 import { setUserData } from '../utils/auth';
-import styles from '../styles/TabNavigation.module.css';
 import "../styles/global.css";
 
 export default function Home() {
   const [authenticated, setAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Connecting to Twitch...");
-  const [activeTab, setActiveTab] = useState('create'); // 'create', 'list', 'league'
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeContent, setActiveContent] = useState(null);
+  const [modalTitle, setModalTitle] = useState('');
 
   // Check for authentication token initially
   useEffect(() => {
@@ -94,12 +97,41 @@ export default function Home() {
     checkAuthInProgress();
   }, [authenticated]);
 
+  // Function to handle navigation button click
+  const handleNavigate = (contentType) => {
+    // Set modal title based on content type
+    const titles = {
+      create: 'Create Prediction',
+      list: 'Your Predictions',
+      league: 'League Integration'
+    };
+    setModalTitle(titles[contentType]);
+
+    // Set the active content type
+    setActiveContent(contentType);
+
+    // Open the modal
+    setIsModalOpen(true);
+  };
+
   // Function to handle prediction creation success
   const handlePredictionCreated = () => {
-    // Optionally switch to prediction list after creation
-    // setActiveTab('list');
+    // Close the modal
+    setIsModalOpen(false);
+  };
 
-    // Or just trigger a refresh of the prediction list if needed
+  // Render the appropriate content based on active content type
+  const renderContent = () => {
+    switch (activeContent) {
+      case 'create':
+        return <CreatePredictionForm onSuccess={handlePredictionCreated} />;
+      case 'list':
+        return <PredictionList />;
+      case 'league':
+        return <LeagueIntegration />;
+      default:
+        return null;
+    }
   };
 
   return (
@@ -117,42 +149,17 @@ export default function Home() {
           <>
             <UserProfile onLogout={() => setAuthenticated(false)} />
 
-            {/* Tab navigation */}
-            <div className={styles.tabButtons}>
-              <button
-                className={`${styles.tabButton} ${activeTab === 'create' ? styles.activeTab : ''}`}
-                onClick={() => setActiveTab('create')}
-              >
-                Create
-              </button>
-              <button
-                className={`${styles.tabButton} ${activeTab === 'list' ? styles.activeTab : ''}`}
-                onClick={() => setActiveTab('list')}
-              >
-                Predictions
-              </button>
-              <button
-                className={`${styles.tabButton} ${activeTab === 'league' ? styles.activeTab : ''}`}
-                onClick={() => setActiveTab('league')}
-              >
-                League
-              </button>
-            </div>
+            {/* Modal for content */}
+            <SlideUpModal
+              isOpen={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              title={modalTitle}
+            >
+              {renderContent()}
+            </SlideUpModal>
 
-            {/* Content container */}
-            <div className={styles.contentContainer}>
-              {activeTab === 'create' && (
-                <CreatePredictionForm onSuccess={handlePredictionCreated} />
-              )}
-
-              {activeTab === 'list' && (
-                <PredictionList />
-              )}
-
-              {activeTab === 'league' && (
-                <LeagueIntegration />
-              )}
-            </div>
+            {/* Bottom Navigation */}
+            <BottomNavigation onNavigate={handleNavigate} />
           </>
         ) : (<>
           <div className='title-container'>

@@ -121,6 +121,8 @@ export async function updateLeagueSettings(accountId, settings) {
             throw new Error('User is not authenticated');
         }
 
+        console.log(`Sending settings update to API: ${JSON.stringify(settings)}`);
+
         const response = await fetch(`${API_BASE_URL}/league/${userData.userId}/accounts/${accountId}/settings`, {
             method: 'PATCH',
             headers: {

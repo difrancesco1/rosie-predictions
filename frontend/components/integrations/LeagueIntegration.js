@@ -68,14 +68,11 @@ export default function LeagueIntegration() {
     };
 
     const handleUpdateSettings = async (account, settingName, value) => {
-        if (!account || !account.id) {
-            console.error('Invalid account data:', account);
-            return;
-        }
-
         try {
             setIsLoading(true);
             setError(null);
+
+            console.log(`Updating ${settingName} to ${value} for account ${account.id}`);
 
             // Prepare settings object
             const settings = {};
@@ -87,6 +84,7 @@ export default function LeagueIntegration() {
             // Reload accounts to reflect changes
             await loadAccountsData();
         } catch (err) {
+            console.error('Error updating settings:', err);
             setError('Failed to update settings: ' + (err.message || 'Unknown error'));
         } finally {
             setIsLoading(false);
@@ -161,38 +159,42 @@ export default function LeagueIntegration() {
                                     <div className={styles.accountSettings}>
                                         <div className={styles.settingRow}>
                                             <span>Auto-create predictions</span>
-                                            <div className={styles.toggle}>
+                                            <label>
                                                 <input
                                                     type="checkbox"
-                                                    id={`create-${account.id}`}
                                                     checked={account.autoCreatePredictions || false}
-                                                    onChange={(e) => handleUpdateSettings(
-                                                        account,
-                                                        'autoCreatePredictions',
-                                                        e.target.checked
-                                                    )}
-                                                    disabled={isLoading}
+                                                    onChange={(e) => {
+                                                        console.log("Toggle clicked!", e.target.checked);
+                                                        handleUpdateSettings(
+                                                            account,
+                                                            'autoCreatePredictions',
+                                                            e.target.checked
+                                                        );
+                                                    }}
+                                                    style={{ marginLeft: '10px' }}
                                                 />
-                                                <span className={styles.slider}></span>
-                                            </div>
+                                                {account.autoCreatePredictions ? "On" : "Off"}
+                                            </label>
                                         </div>
 
                                         <div className={styles.settingRow}>
                                             <span>Auto-resolve predictions</span>
-                                            <div className={styles.toggle}>
+                                            <label>
                                                 <input
                                                     type="checkbox"
-                                                    id={`resolve-${account.id}`}
                                                     checked={account.autoResolvePredictions || false}
-                                                    onChange={(e) => handleUpdateSettings(
-                                                        account,
-                                                        'autoResolvePredictions',
-                                                        e.target.checked
-                                                    )}
-                                                    disabled={isLoading}
+                                                    onChange={(e) => {
+                                                        console.log("Resolve toggle clicked!", e.target.checked);
+                                                        handleUpdateSettings(
+                                                            account,
+                                                            'autoResolvePredictions',
+                                                            e.target.checked
+                                                        );
+                                                    }}
+                                                    style={{ marginLeft: '10px' }}
                                                 />
-                                                <span className={styles.slider}></span>
-                                            </div>
+                                                {account.autoResolvePredictions ? "On" : "Off"}
+                                            </label>
                                         </div>
                                     </div>
 

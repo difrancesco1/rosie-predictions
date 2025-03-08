@@ -1,0 +1,43 @@
+/* styles/BottomNavigation.module.css */
+.bottomNavContainer {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    padding: 8px;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    justify-content: space-around;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+  }
+  
+  .navButton {
+    flex: 1;
+    margin: 0 5px;
+    padding: 12px 0;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    font-family: "Pixelify Sans", sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: #555;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 100px;
+  }
+  
+  .navButton:hover {
+    background-color: #f0f0f0;
+  }
+  
+  .navButton:active {
+    background-color: #e0e0e0;
+    transform: scale(0.97);
+  }
